@@ -1,11 +1,9 @@
-// NiceChatServer.cpp : Defines the entry point for the console application.
-//
-
 #include "stdafx.h"
+#include "Server.h"
 
 
 int main()
 {
-    return 0;
+	Server server;
+	server.Listen();
 }
-
