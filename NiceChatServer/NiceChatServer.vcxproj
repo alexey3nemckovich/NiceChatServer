@@ -145,12 +145,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\NiceChatServer\NiceChatServer\Server.h" />
+    <ClInclude Include="Client.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\NiceChatServer\NiceChatServer\Server.cpp" />
-    <ClCompile Include="NiceChatServer.cpp" />
+    <ClCompile Include="Client.cpp" />
+    <ClCompile Include="Main.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>

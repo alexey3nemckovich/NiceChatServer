@@ -3,15 +3,26 @@
 
 
 DWORD WINAPI ClientProc(LPVOID client_socket);
-void Registrate(SOCKET client);
-void Login(SOCKET client);
-void GetOtherClientAddr(SOCKET client);
-void ClientLeaveChat(SOCKET client);
 
 
 Server::Server()
 {
 	Init();
+}
+
+
+Server::~Server()
+{
+	free(buff);
+	closesocket(sock);
+	WSACleanup();
+}
+
+
+Server* Server::GetInstance()
+{
+	static Server server = Server();
+	return &server;
 }
 
 
@@ -47,14 +58,6 @@ void Server::Init()
 }
 
 
-Server::~Server()
-{
-	free(buff);
-	closesocket(sock);
-	WSACleanup();
-}
-
-
 /*
 @Server listening operation
 @Is receives data, where first byte from client
@@ -84,6 +87,7 @@ void Server::Listen()
 
 DWORD WINAPI ClientProc(LPVOID client_socket)
 {
+
 	char operation_num;
 	SOCKET my_sock;
 	my_sock = ((SOCKET *)client_socket)[0];
@@ -91,16 +95,16 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 	switch (operation_num)
 	{
 	case 0:
-		Registrate(my_sock);
+		Server::GetInstance()->Registrate(my_sock);
 		break;
 	case 1:
-		Login(my_sock);
+		Server::GetInstance()->Login(my_sock);
 		break;
 	case 2:
-		GetOtherClientAddr(my_sock);
+		Server::GetInstance()->GetOtherClientAddr(my_sock);
 		break;
 	case 3:
-		ClientLeaveChat(my_sock);
+		Server::GetInstance()->ClientLeaveChat(my_sock);
 		break;
 	default:
 		break;
@@ -113,37 +117,57 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 }
 
 
-void Registrate(SOCKET client)
+void Server::Registrate(SOCKET client)
 {
-	char name[Server::str_buff_size];
-	char last_name[Server::str_buff_size];
-	char login[Server::str_buff_size];
-	char pass[Server::str_buff_size];
-	ZeroMemory(name, Server::str_buff_size);
-	ZeroMemory(last_name, Server::str_buff_size);
-	ZeroMemory(login, Server::str_buff_size);
-	ZeroMemory(pass, Server::str_buff_size);
-	recv(client, name, Server::str_buff_size, 0);
-	recv(client, last_name, Server::str_buff_size, 0);
-	recv(client, login, Server::str_buff_size, 0);
-	recv(client, pass, Server::str_buff_size, 0);
-	printf("Registrated client:\nName - %s\nLast name - %s\nLogin - %s\nPassword - %s\n", name, last_name, login, pass);
+	char name[STR_BUFF_SIZE];
+	char last_name[STR_BUFF_SIZE];
+	char login[STR_BUFF_SIZE];
+	char pass[STR_BUFF_SIZE];
+	ZeroMemory(name, STR_BUFF_SIZE);
+	ZeroMemory(last_name, STR_BUFF_SIZE);
+	ZeroMemory(login, STR_BUFF_SIZE);
+	ZeroMemory(pass, STR_BUFF_SIZE);
+	recv(client, name, STR_BUFF_SIZE, 0);
+	recv(client, last_name, STR_BUFF_SIZE, 0);
+	recv(client, login, STR_BUFF_SIZE, 0);
+	recv(client, pass, STR_BUFF_SIZE, 0);
+	if (FreeLogin(login))
+	{
+		Client client = Client(name, last_name, login, pass);
+		clients.push_back(client);
+		printf("Registrated new client:\
+		\nName - %s\
+		\nLast name - %s\
+		\nLogin - %s\
+		\nPassword - %s\n",
+			name, last_name, login, pass);
+	}
+	else
+	{
+
+	}
 }
 
 
-void Login(SOCKET client)
+bool Server::FreeLogin(char *login)
+{
+	return true;
+}
+
+
+void Server::Login(SOCKET client)
 {
 
 }
 
 
-void GetOtherClientAddr(SOCKET client)
+void Server::GetOtherClientAddr(SOCKET client)
 {
 
 }
 
 
-void ClientLeaveChat(SOCKET client)
+void Server::ClientLeaveChat(SOCKET client)
 {
 
 }

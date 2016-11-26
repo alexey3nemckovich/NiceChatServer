@@ -4,6 +4,5 @@
 
 int main()
 {
-	Server server;
-	server.Listen();
+	Server::GetInstance()->Listen();
 }
