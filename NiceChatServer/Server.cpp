@@ -143,7 +143,6 @@ void Server::Registrate(SOCKET client)
 	recv(client, (char*)&udp_client_video_list_addr, sizeof(udp_client_video_list_addr), 0);
 	if (FreeLogin(login))
 	{
-		send(client, "", 0, 0);
 		Client client = Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
 		clients.push_back(client);
 		printf("Registrated new client:\
