@@ -13,8 +13,8 @@ Server::Server()
 
 Server::~Server()
 {
-	free(buff);
-	closesocket(sock);
+	closesocket(udp_sock);
+	closesocket(tcp_sock);
 	WSACleanup();
 }
 
@@ -28,17 +28,16 @@ Server* Server::GetInstance()
 
 void Server::Init()
 {
-	buff = (char*)malloc(BUFF_LEN);
-	WSADATA wsa;
 	//Initialise winsock lib
-	if (WSAStartup(MAKEWORD(2, 2), (WSADATA*)buff))
+	WSADATA wsa;
+	if (WSAStartup(MAKEWORD(2, 2), &wsa))
 	{
 		printf("Error WSAStartup %d\nPress 'Enter' to exit.", WSAGetLastError());
 		getchar();
 		ExitProcess(0);
 	}
-	//Create a socket
-	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	//Create tcp socket
+	if ((tcp_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		printf("Error creating socket %d\nPress 'Enter' to exit.", WSAGetLastError());
 		WSACleanup();
@@ -48,10 +47,17 @@ void Server::Init()
 	sock_addr.sin_family = AF_INET;
 	sock_addr.sin_port = htons(SERVER_PORT);
 	sock_addr.sin_addr.s_addr = 0;
-	if (bind(sock, (sockaddr*)&sock_addr, sizeof(sock_addr)))
+	if (bind(tcp_sock, (sockaddr*)&sock_addr, sizeof(sock_addr)))
 	{
 		printf("Error bind %d\nPress 'Enter' to exit.", WSAGetLastError());
-		closesocket(sock);
+		closesocket(tcp_sock);
+		WSACleanup();
+		ExitProcess(0);
+	}
+	//Create udp socket
+	if ((udp_sock = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
+	{
+		printf("Error creating socket %d\nPress 'Enter' to exit.", WSAGetLastError());
 		WSACleanup();
 		ExitProcess(0);
 	}
@@ -71,11 +77,11 @@ void Server::Listen()
 {
 	printf("NiceChat Server\n");
 	printf("Waiting for connections...\n");
-	listen(sock, 0x100);
+	listen(tcp_sock, 0x100);
 	SOCKET client_socket;
 	struct sockaddr_in client_addr;
 	int client_addr_size = sizeof(client_addr);
-	while ((client_socket = accept(sock, (sockaddr *)
+	while ((client_socket = accept(tcp_sock, (sockaddr *)
 		&client_addr, &client_addr_size)))
 	{
 		DWORD thID;
@@ -123,6 +129,8 @@ void Server::Registrate(SOCKET client)
 	char last_name[STR_BUFF_SIZE];
 	char login[STR_BUFF_SIZE];
 	char pass[STR_BUFF_SIZE];
+	sockaddr_in udp_client_serv_list_addr;
+	sockaddr_in udp_client_video_list_addr;
 	ZeroMemory(name, STR_BUFF_SIZE);
 	ZeroMemory(last_name, STR_BUFF_SIZE);
 	ZeroMemory(login, STR_BUFF_SIZE);
@@ -131,9 +139,12 @@ void Server::Registrate(SOCKET client)
 	recv(client, last_name, STR_BUFF_SIZE, 0);
 	recv(client, login, STR_BUFF_SIZE, 0);
 	recv(client, pass, STR_BUFF_SIZE, 0);
+	recv(client, (char*)&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr), 0);
+	recv(client, (char*)&udp_client_video_list_addr, sizeof(udp_client_video_list_addr), 0);
 	if (FreeLogin(login))
 	{
-		Client client = Client(name, last_name, login, pass);
+		send(client, "", 0, 0);
+		Client client = Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
 		clients.push_back(client);
 		printf("Registrated new client:\
 		\nName - %s\
@@ -141,16 +152,25 @@ void Server::Registrate(SOCKET client)
 		\nLogin - %s\
 		\nPassword - %s\n",
 			name, last_name, login, pass);
+		//sendto(udp_sock, last_name, strlen(last_name), 0, (sockaddr*)&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr));
 	}
 	else
 	{
-
+		char *err_msg = "Login is not free.";
+		send(client, err_msg, strlen(err_msg), 0);
 	}
 }
 
 
 bool Server::FreeLogin(char *login)
 {
+	for each (Client client in clients)
+	{
+		if (strcmp(login, client.Login()) == 0)
+		{
+			return false;
+		}
+	}
 	return true;
 }
 

@@ -8,8 +8,8 @@ class Server
 {
 private:
 	//Fields
-	char* buff;
-	SOCKET sock;
+	SOCKET udp_sock;
+	SOCKET tcp_sock;
 	std::vector<Client> clients;
 	//Methods
 	Server();

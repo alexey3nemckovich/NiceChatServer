@@ -1,4 +1,5 @@
 #pragma once
+#include <WinSock2.h>
 
 
 class Client
@@ -8,8 +9,17 @@ private:
 	char last_name[STR_BUFF_SIZE];
 	char login[STR_BUFF_SIZE];
 	char pass[STR_BUFF_SIZE];
+	sockaddr_in udp_serv_list_addr;
+	sockaddr_in udp_video_list_addr;
 public:
-	Client(char* name, char* last_name, char *login, char *pass);
+	Client(
+		char* name,
+		char* last_name,
+		char *login,
+		char *pass,
+		sockaddr_in udp_serv_list_addr,
+		sockaddr_in udp_video_list_addr
+	);
 	~Client();
 	char *const Name()
 	{
