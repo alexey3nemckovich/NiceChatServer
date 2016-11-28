@@ -66,12 +66,8 @@ void Server::Init()
 
 /*
 @Server listening operation
-@Is receives data, where first byte from client
-@says, what type of operation is requested:
-@	0 - registration
-@	1 - logination
-@	2 - desire to connect to another client
-@	3 - desite to leave chat
+@Creates new thread for every new client connection
+@to process his requests.
 */
 void Server::Listen()
 {
@@ -91,6 +87,16 @@ void Server::Listen()
 }
 
 
+/*
+@Client processing procedure
+@Is receives data, where first byte from client
+@says, what type of operation is requested:
+@	0 - registration
+@	1 - logination
+@	2 - connect to another client
+@	3 - leave chat
+@   4 - get online clients list
+*/
 DWORD WINAPI ClientProc(LPVOID client_socket)
 {
 
@@ -107,10 +113,13 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 		Server::GetInstance()->Login(my_sock);
 		break;
 	case 2:
-		Server::GetInstance()->GetOtherClientAddr(my_sock);
+		Server::GetInstance()->GiveOtherClientAddr(my_sock);
 		break;
 	case 3:
 		Server::GetInstance()->ClientLeaveChat(my_sock);
+		break;
+	case 4:
+		Server::GetInstance()->GiveOnlineClientsList(my_sock);
 		break;
 	default:
 		break;
@@ -152,6 +161,7 @@ void Server::Registrate(SOCKET client)
 	{
 		Client client = Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
 		clients.push_back(client);
+		onlineClients.push_back(client);
 		printf("Registrated new client:\
 		\nName - %s\
 		\nLast name - %s\
@@ -186,7 +196,7 @@ void Server::Login(SOCKET client)
 }
 
 
-void Server::GetOtherClientAddr(SOCKET client)
+void Server::GiveOtherClientAddr(SOCKET client)
 {
 
 }
@@ -195,4 +205,18 @@ void Server::GetOtherClientAddr(SOCKET client)
 void Server::ClientLeaveChat(SOCKET client)
 {
 
+}
+
+
+void Server::GiveOnlineClientsList(SOCKET client)
+{
+	int countOnlineClients = onlineClients.size();
+	send(client, (char*)&countOnlineClients, sizeof(countOnlineClients), 0);
+	char *clientLogin;
+	for (int i = 0; i < countOnlineClients; i++)
+	{
+		Sleep(5);
+		clientLogin = onlineClients[i].Login();
+		send(client, clientLogin, strlen(clientLogin), 0);
+	}
 }

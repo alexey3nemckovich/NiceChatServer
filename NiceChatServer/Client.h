@@ -11,6 +11,7 @@ private:
 	char pass[STR_BUFF_SIZE];
 	sockaddr_in udp_serv_list_addr;
 	sockaddr_in udp_video_list_addr;
+	bool online = false;
 public:
 	Client(
 		char* name,
@@ -36,5 +37,9 @@ public:
 	char *const Pass()
 	{
 		return pass;
+	}
+	bool IsOnline()
+	{
+		return online;
 	}
 };

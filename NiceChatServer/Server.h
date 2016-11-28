@@ -13,6 +13,7 @@ private:
 	SOCKET udp_sock;
 	SOCKET tcp_sock;
 	std::vector<Client> clients;
+	std::vector<Client> onlineClients;
 	//Methods
 	Server();
 	~Server();
@@ -20,7 +21,8 @@ private:
 	friend DWORD WINAPI ClientProc(LPVOID client_socket);
 	void Registrate(SOCKET client);
 	void Login(SOCKET client);
-	void GetOtherClientAddr(SOCKET client);
+	void GiveOtherClientAddr(SOCKET client);
+	void GiveOnlineClientsList(SOCKET client);
 	void ClientLeaveChat(SOCKET client);
 	bool FreeLogin(char *login);
 public:
