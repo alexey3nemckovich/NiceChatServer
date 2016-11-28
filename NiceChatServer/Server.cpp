@@ -162,12 +162,14 @@ void Server::Registrate(SOCKET client)
 		Client client = Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
 		clients.push_back(client);
 		onlineClients.push_back(client);
+		//sendto(udp_sock, NULL, 0, 0, (sockaddr*)&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr));
 		printf("Registrated new client:\
 		\nName - %s\
 		\nLast name - %s\
 		\nLogin - %s\
 		\nPassword - %s\n",
 			name, last_name, login, pass);
+		NotifyClientsAboutNewJoin(client);
 	}
 	else
 	{
@@ -218,5 +220,27 @@ void Server::GiveOnlineClientsList(SOCKET client)
 		Sleep(5);
 		clientLogin = onlineClients[i].Login();
 		send(client, clientLogin, strlen(clientLogin), 0);
+	}
+}
+
+
+void Server::NotifyClientsAboutNewJoin(Client joinedClient)
+{
+	char buff[BUFF_LEN];
+	int countOnlineClients = onlineClients.size();
+	for (int i = 0; i < countOnlineClients; i++)
+	{
+		if (strcmp(onlineClients[i].Login(), joinedClient.Login()) != 0)
+		{
+			buff[0] = 2;
+			sendto(
+				udp_sock,
+				buff,
+				BUFF_LEN,
+				0,
+				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
+				sizeof(onlineClients[i].udp_serv_list_addr)
+			);
+		}
 	}
 }
