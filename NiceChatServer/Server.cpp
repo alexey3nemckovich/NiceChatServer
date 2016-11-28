@@ -125,7 +125,7 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 
 void Server::Registrate(SOCKET client)
 {
-	////
+	//Get client info
 	char name[STR_BUFF_SIZE];
 	char last_name[STR_BUFF_SIZE];
 	char login[STR_BUFF_SIZE];
