@@ -45,7 +45,7 @@ void Server::Init()
 	}
 	sockaddr_in sock_addr;
 	sock_addr.sin_family = AF_INET;
-	sock_addr.sin_port = htons(SERVER_PORT);
+	sock_addr.sin_port = htons(Server::PORT);
 	sock_addr.sin_addr.s_addr = 0;
 	if (bind(tcp_sock, (sockaddr*)&sock_addr, sizeof(sock_addr)))
 	{
@@ -138,35 +138,16 @@ void Server::Registrate(SOCKET client)
 	recv(client, last_name, STR_BUFF_SIZE, 0);
 	recv(client, login, STR_BUFF_SIZE, 0);
 	recv(client, pass, STR_BUFF_SIZE, 0);
-	//
-	USHORT port;
-	ULONG sAddr;
-	char buff[1000];
+	char buff[Server::BUFF_LEN];
+	ZeroMemory(buff, Server::BUFF_LEN);
 	//Get client serv list addr
 	sockaddr_in udp_client_serv_list_addr;
-	ZeroMemory(&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr));
-	udp_client_serv_list_addr.sin_family = AF_INET;
-
-	recv(client, buff, 1000, 0);
-	port = ((USHORT*)buff)[0];
-	udp_client_serv_list_addr.sin_port = port;
-
-	recv(client, buff, 1000, 0);
-	sAddr = ((ULONG*)buff)[0];
-	udp_client_serv_list_addr.sin_addr.S_un.S_addr = sAddr;
+	recv(client, buff, Server::BUFF_LEN, 0);
+	udp_client_serv_list_addr = ((sockaddr_in*)buff)[0];
 	//Get client video list addr
 	sockaddr_in udp_client_video_list_addr;
-	ZeroMemory(&udp_client_video_list_addr, sizeof(udp_client_video_list_addr));
-	udp_client_video_list_addr.sin_family = AF_INET;
-
-	recv(client, buff, 1000, 0);
-	port = ((USHORT*)buff)[0];
-	udp_client_video_list_addr.sin_port = port;
-
-	recv(client, buff, 1000, 0);
-	sAddr = ((ULONG*)buff)[0];
-	udp_client_video_list_addr.sin_addr.S_un.S_addr = sAddr;
-	//
+	recv(client, buff, Server::BUFF_LEN, 0);
+	udp_client_video_list_addr = ((sockaddr_in*)buff)[0];
 	if (FreeLogin(login))
 	{
 		Client client = Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
@@ -177,8 +158,6 @@ void Server::Registrate(SOCKET client)
 		\nLogin - %s\
 		\nPassword - %s\n",
 			name, last_name, login, pass);
-		sendto(udp_sock, last_name, strlen(last_name), 0, (sockaddr*)&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr));
-		sendto(udp_sock, last_name, strlen(last_name), 0, (sockaddr*)&udp_client_video_list_addr, sizeof(udp_client_video_list_addr));
 	}
 	else
 	{

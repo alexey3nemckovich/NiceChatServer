@@ -9,9 +9,6 @@
 
 #include <stdio.h>
 #include <tchar.h>
-#define WAR
-#define SERVER_PORT 666
-#define BUFF_LEN 1000000
 #define STR_BUFF_SIZE 50
 
 // TODO: reference additional headers your program requires here

@@ -11,6 +11,8 @@ private:
 	SOCKET udp_sock;
 	SOCKET tcp_sock;
 	std::vector<Client> clients;
+	static const int PORT = 666;
+	static const int BUFF_LEN = 1000000;
 	//Methods
 	Server();
 	~Server();
