@@ -2,6 +2,7 @@
 #include <winsock2.h>
 #include <vector>
 #include "Client.h"
+#include "ClientNotFoundException.h"
 
 
 class Server
@@ -19,13 +20,14 @@ private:
 	~Server();
 	void Init();
 	friend DWORD WINAPI ClientProc(LPVOID client_socket);
-	void Registrate(SOCKET client);
-	void Login(SOCKET client);
-	void GiveOtherClientAddr(SOCKET client);
-	void GiveOnlineClientsList(SOCKET client);
-	void ClientLeaveChat(SOCKET client);
+	void Registrate(SOCKET clientSock);
+	void Login(SOCKET clientSock);
+	void GiveOtherClientAddr(SOCKET clientSock);
+	void GiveOnlineClientsList(SOCKET clientSock);
+	void ClientLeaveChat(SOCKET clientSock);
 	bool FreeLogin(char *login);
-	void NotifyClientsAboutNewJoin(Client joinedClient);
+	bool ClientRegistered(char *login, Client **client);
+	void NotifyClientsAboutEvent(char eventNumber, char *eventSrcClientLogin);
 public:
 	static Server* GetInstance();
 	static const int str_buff_size = 50;

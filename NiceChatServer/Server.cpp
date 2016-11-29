@@ -132,7 +132,7 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 }
 
 
-void Server::Registrate(SOCKET client)
+void Server::Registrate(SOCKET clientSock)
 {
 	//Get client info
 	char name[STR_BUFF_SIZE];
@@ -143,19 +143,19 @@ void Server::Registrate(SOCKET client)
 	ZeroMemory(last_name, STR_BUFF_SIZE);
 	ZeroMemory(login, STR_BUFF_SIZE);
 	ZeroMemory(pass, STR_BUFF_SIZE);
-	recv(client, name, STR_BUFF_SIZE, 0);
-	recv(client, last_name, STR_BUFF_SIZE, 0);
-	recv(client, login, STR_BUFF_SIZE, 0);
-	recv(client, pass, STR_BUFF_SIZE, 0);
+	recv(clientSock, name, STR_BUFF_SIZE, 0);
+	recv(clientSock, last_name, STR_BUFF_SIZE, 0);
+	recv(clientSock, login, STR_BUFF_SIZE, 0);
+	recv(clientSock, pass, STR_BUFF_SIZE, 0);
 	char buff[Server::BUFF_LEN];
 	ZeroMemory(buff, Server::BUFF_LEN);
-	//Get client serv list addr
+	//Get clientSock serv list addr
 	sockaddr_in udp_client_serv_list_addr;
-	recv(client, buff, Server::BUFF_LEN, 0);
+	recv(clientSock, buff, Server::BUFF_LEN, 0);
 	udp_client_serv_list_addr = ((sockaddr_in*)buff)[0];
 	//Get client video list addr
 	sockaddr_in udp_client_video_list_addr;
-	recv(client, buff, Server::BUFF_LEN, 0);
+	recv(clientSock, buff, Server::BUFF_LEN, 0);
 	udp_client_video_list_addr = ((sockaddr_in*)buff)[0];
 	if (FreeLogin(login))
 	{
@@ -164,17 +164,121 @@ void Server::Registrate(SOCKET client)
 		onlineClients.push_back(client);
 		//sendto(udp_sock, NULL, 0, 0, (sockaddr*)&udp_client_serv_list_addr, sizeof(udp_client_serv_list_addr));
 		printf("Registrated new client:\
-		\nName - %s\
-		\nLast name - %s\
-		\nLogin - %s\
-		\nPassword - %s\n",
+		\n\tName - %s;\
+		\n\tLast name - %s;\
+		\n\tLogin - %s;\
+		\n\tPassword - %s.\n",
 			name, last_name, login, pass);
-		NotifyClientsAboutNewJoin(client);
+		NotifyClientsAboutEvent(2, client.Login());
 	}
 	else
 	{
 		char *err_msg = "Login is not free.";
-		send(client, err_msg, strlen(err_msg), 0);
+		send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+	}
+}
+
+
+void Server::Login(SOCKET clientSock)
+{
+	//Get login info
+	char login[STR_BUFF_SIZE];
+	char pass[STR_BUFF_SIZE];
+	ZeroMemory(login, STR_BUFF_SIZE);
+	ZeroMemory(pass, STR_BUFF_SIZE);
+	recv(clientSock, login, STR_BUFF_SIZE, 0);
+	recv(clientSock, pass, STR_BUFF_SIZE, 0);
+	Client* client = nullptr;
+	if (ClientRegistered(login, &client))
+	{
+		if (strcmp(client->Pass(), pass) == 0)
+		{
+			onlineClients.push_back(*client);
+			printf("Logined client '%s'.\n", login);
+			NotifyClientsAboutEvent(2, login);
+		}
+		else
+		{
+			char *err_msg = "Incorrect password.";
+			send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+		}
+	}
+	else
+	{
+		char *err_msg = "Client with such login is not registered.";
+		send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+	}
+}
+
+
+void Server::GiveOtherClientAddr(SOCKET clientSock)
+{
+	//code
+}
+
+
+void Server::ClientLeaveChat(SOCKET clientSock)
+{
+	char clientLogin[BUFF_LEN];
+	recv(clientSock, clientLogin, BUFF_LEN, 0);
+	int countOnlineClients = onlineClients.size();
+	int clientIndex = 0;
+	for (int i = 0; i < countOnlineClients; i++)
+	{
+		if (strcmp(onlineClients[i].Login(), clientLogin) == 0)
+		{
+			clientIndex = i;
+			break;
+		}
+	}
+	char leavedClientLogin[STR_BUFF_SIZE];
+	strcpy(leavedClientLogin, onlineClients[clientIndex].Login());
+	NotifyClientsAboutEvent(1, leavedClientLogin);
+	onlineClients.erase(onlineClients.begin() + clientIndex);
+	printf("Client '%s' leaved chat.\n", leavedClientLogin);
+}
+
+
+void Server::GiveOnlineClientsList(SOCKET clientSock)
+{
+	int countOnlineClients = onlineClients.size();
+	send(clientSock, (char*)&countOnlineClients, sizeof(countOnlineClients), 0);
+	char *clientLogin;
+	for (int i = 0; i < countOnlineClients; i++)
+	{
+		Sleep(50);
+		clientLogin = onlineClients[i].Login();
+		send(clientSock, clientLogin, strlen(clientLogin) + 1, 0);
+	}
+}
+
+
+void Server::NotifyClientsAboutEvent(char eventNumber, char *eventSrcClientLogin)
+{
+	int msgLen = strlen(eventSrcClientLogin) + 1;
+	int countOnlineClients = onlineClients.size();
+	for (int i = 0; i < countOnlineClients; i++)
+	{
+		if (strcmp(onlineClients[i].Login(), eventSrcClientLogin) != 0)
+		{
+			sendto(
+				udp_sock,
+				&eventNumber,
+				sizeof(eventNumber),
+				0,
+				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
+				sizeof(onlineClients[i].udp_serv_list_addr)
+			);
+			Sleep(50);
+			sendto(
+				udp_sock,
+				eventSrcClientLogin,
+				msgLen,
+				0,
+				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
+				sizeof(onlineClients[i].udp_serv_list_addr)
+			);
+		}
 	}
 }
 
@@ -192,65 +296,16 @@ bool Server::FreeLogin(char *login)
 }
 
 
-void Server::Login(SOCKET client)
+bool Server::ClientRegistered(char *login, Client **client)
 {
-
-}
-
-
-void Server::GiveOtherClientAddr(SOCKET client)
-{
-
-}
-
-
-void Server::ClientLeaveChat(SOCKET client)
-{
-
-}
-
-
-void Server::GiveOnlineClientsList(SOCKET client)
-{
-	int countOnlineClients = onlineClients.size();
-	send(client, (char*)&countOnlineClients, sizeof(countOnlineClients), 0);
-	char *clientLogin;
-	for (int i = 0; i < countOnlineClients; i++)
+	int countRegisteredClients = clients.size();
+	for (int i = 0; i < countRegisteredClients; i++)
 	{
-		Sleep(5);
-		clientLogin = onlineClients[i].Login();
-		send(client, clientLogin, strlen(clientLogin), 0);
-	}
-}
-
-
-void Server::NotifyClientsAboutNewJoin(Client joinedClient)
-{
-	char eventNumber = 2;
-	char *joinedClientLogin = joinedClient.Login();
-	int joinedClientLoginLen = strlen(joinedClientLogin) + 1;
-	int countOnlineClients = onlineClients.size();
-	for (int i = 0; i < countOnlineClients; i++)
-	{
-		if (strcmp(onlineClients[i].Login(), joinedClient.Login()) != 0)
+		if (strcmp(login, clients[i].Login()) == 0)
 		{
-			sendto(
-				udp_sock,
-				&eventNumber,
-				sizeof(eventNumber),
-				0,
-				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
-				sizeof(onlineClients[i].udp_serv_list_addr)
-			);
-			Sleep(5);
-			sendto(
-				udp_sock,
-				joinedClientLogin,
-				joinedClientLoginLen,
-				0,
-				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
-				sizeof(onlineClients[i].udp_serv_list_addr)
-			);
+			(*client) = &(clients[i]);
+			return true;
 		}
 	}
+	return false;
 }
