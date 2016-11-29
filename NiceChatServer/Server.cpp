@@ -226,17 +226,27 @@ void Server::GiveOnlineClientsList(SOCKET client)
 
 void Server::NotifyClientsAboutNewJoin(Client joinedClient)
 {
-	char buff[BUFF_LEN];
+	char eventNumber = 2;
+	char *joinedClientLogin = joinedClient.Login();
+	int joinedClientLoginLen = strlen(joinedClientLogin) + 1;
 	int countOnlineClients = onlineClients.size();
 	for (int i = 0; i < countOnlineClients; i++)
 	{
 		if (strcmp(onlineClients[i].Login(), joinedClient.Login()) != 0)
 		{
-			buff[0] = 2;
 			sendto(
 				udp_sock,
-				buff,
-				BUFF_LEN,
+				&eventNumber,
+				sizeof(eventNumber),
+				0,
+				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
+				sizeof(onlineClients[i].udp_serv_list_addr)
+			);
+			Sleep(5);
+			sendto(
+				udp_sock,
+				joinedClientLogin,
+				joinedClientLoginLen,
 				0,
 				(sockaddr*)&onlineClients[i].udp_serv_list_addr,
 				sizeof(onlineClients[i].udp_serv_list_addr)
