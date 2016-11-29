@@ -18,6 +18,7 @@ Client::Client(
 	strcpy(this->pass, pass);
 	this->udp_serv_list_addr = udp_serv_list_addr;
 	this->udp_video_list_addr = udp_video_list_addr;
+	online = false;
 }
 
 

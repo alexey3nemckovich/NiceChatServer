@@ -40,6 +40,14 @@ public:
 	{
 		return online;
 	}
+	void SetOnline()
+	{
+		online = true;
+	}
+	void SetOffline()
+	{
+		online = false;
+	}
 	sockaddr_in udp_serv_list_addr;
 	sockaddr_in udp_video_list_addr;
 };

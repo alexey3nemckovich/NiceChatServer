@@ -13,8 +13,8 @@ private:
 	static const int BUFF_LEN = 1000;
 	SOCKET udp_sock;
 	SOCKET tcp_sock;
-	std::vector<Client> clients;
-	std::vector<Client> onlineClients;
+	std::vector<Client*> clients;
+	std::vector<Client*> onlineClients;
 	//Methods
 	Server();
 	~Server();
