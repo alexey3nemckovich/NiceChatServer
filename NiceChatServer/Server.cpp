@@ -196,7 +196,7 @@ void Server::Login(SOCKET clientSock)
 	recv(clientSock, login, STR_BUFF_SIZE, 0);
 	recv(clientSock, pass, STR_BUFF_SIZE, 0);
 	Client* client = nullptr;
-	if (ClientRegistered(login, &client))
+	if (ClientRegistered(login, client))
 	{
 		if (!client->IsOnline())
 		{
@@ -321,14 +321,14 @@ bool Server::FreeLogin(char *login)
 }
 
 
-bool Server::ClientRegistered(char *login, Client **client)
+bool Server::ClientRegistered(char *login, Client* &client)
 {
 	int countRegisteredClients = clients.size();
 	for (int i = 0; i < countRegisteredClients; i++)
 	{
 		if (strcmp(login, clients[i]->Login()) == 0)
 		{
-			(*client) = clients[i];
+			client = clients[i];
 			return true;
 		}
 	}

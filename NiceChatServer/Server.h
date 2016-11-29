@@ -26,7 +26,7 @@ private:
 	void GiveOnlineClientsList(SOCKET clientSock);
 	void ClientLeaveChat(SOCKET clientSock);
 	bool FreeLogin(char *login);
-	bool ClientRegistered(char *login, Client **client);
+	bool ClientRegistered(char *login, Client* &client);
 	void NotifyClientsAboutEvent(char eventNumber, char *eventSrcClientLogin);
 public:
 	static Server* GetInstance();
