@@ -105,7 +105,6 @@ void Server::Listen()
 */
 DWORD WINAPI ClientProc(LPVOID client_socket)
 {
-
 	char operation_num;
 	SOCKET my_sock;
 	my_sock = ((SOCKET *)client_socket)[0];
@@ -237,7 +236,32 @@ void Server::Login(SOCKET clientSock)
 
 void Server::GiveOtherClientAddr(SOCKET clientSock)
 {
-	//code
+	char login[STR_BUFF_SIZE];
+	char destClientLogin[STR_BUFF_SIZE];
+	ZeroMemory(login, STR_BUFF_SIZE);
+	ZeroMemory(destClientLogin, STR_BUFF_SIZE);
+	recv(clientSock, login, STR_BUFF_SIZE, 0);
+	recv(clientSock, destClientLogin, STR_BUFF_SIZE, 0);
+	Client* destClient;
+	ClientRegistered(destClientLogin, destClient);
+	char callEventNumber = 2;
+	sockaddr_in destAddr = destClient->udp_serv_list_addr;
+	int destAddrSize = sizeof(destAddr);
+	sendto(udp_sock, &callEventNumber, sizeof(callEventNumber), 0, (sockaddr*)&(destAddr), destAddrSize);
+	char buff[BUFF_LEN];
+	recvfrom(udp_sock, buff, BUFF_LEN, 0, (sockaddr*)&(destAddr), &destAddrSize);
+	if (strcmp(buff, "accept") == 0)
+	{
+		char *acceptedStr = "call accepted";
+		send(clientSock, acceptedStr, strlen(acceptedStr) + 1, 0);
+		Sleep(50);
+		send(clientSock, (char*)&destAddr, destAddrSize, 0);
+	}
+	else
+	{
+		char *cancelledStr = "cancelled";
+		send(clientSock, cancelledStr, strlen(cancelledStr) + 1, 0);
+	}
 }
 
 
