@@ -193,6 +193,14 @@ void Server::Login(SOCKET clientSock)
 	{
 		if (strcmp(client->Pass(), pass) == 0)
 		{
+			char *loginOk = "ok";
+			char *name = client->Name();
+			char *lastName = client->LastName();
+			send(clientSock, loginOk, strlen(loginOk) + 1, 0);
+			Sleep(50);
+			send(clientSock, name, strlen(name) + 1, 0);
+			Sleep(50);
+			send(clientSock, lastName, strlen(lastName) + 1, 0);
 			onlineClients.push_back(*client);
 			printf("Logined client '%s'.\n", login);
 			NotifyClientsAboutEvent(2, login);
