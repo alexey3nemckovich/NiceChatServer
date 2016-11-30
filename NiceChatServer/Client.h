@@ -10,6 +10,7 @@ private:
 	char login[STR_BUFF_SIZE];
 	char pass[STR_BUFF_SIZE];
 	bool online = false;
+	bool onCall = false;
 public:
 	Client(
 		char* name,
@@ -47,6 +48,18 @@ public:
 	void SetOffline()
 	{
 		online = false;
+	}
+	bool IsOnCall()
+	{
+		return onCall;
+	}
+	void SetOnCall()
+	{
+		onCall = true;
+	}
+	void SetFree()
+	{
+		onCall = false;
 	}
 	sockaddr_in udp_serv_list_addr;
 	sockaddr_in udp_video_list_addr;

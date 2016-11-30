@@ -1,4 +1,10 @@
 #pragma once
+
+
+#define CALL_ACCEPT_STR "accept"
+#define CALL_CANCEL_STR "cancel"
+
+
 #include <winsock2.h>
 #include <vector>
 #include "Client.h"
@@ -9,7 +15,8 @@ class Server
 {
 private:
 	//Fields
-	static const int PORT = 666;
+	static const int TCP_PORT = 666;
+	static const int UDP_PORT = 777;
 	static const int BUFF_LEN = 1000;
 	SOCKET udp_sock;
 	SOCKET tcp_sock;
@@ -22,7 +29,7 @@ private:
 	friend DWORD WINAPI ClientProc(LPVOID client_socket);
 	void Registrate(SOCKET clientSock);
 	void Login(SOCKET clientSock);
-	void GiveOtherClientAddr(SOCKET clientSock);
+	void Connect(SOCKET clientSock);
 	void GiveOnlineClientsList(SOCKET clientSock);
 	void ClientLeaveChat(SOCKET clientSock);
 	bool FreeLogin(char *login);

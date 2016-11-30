@@ -34,6 +34,7 @@ Server* Server::GetInstance()
 
 void Server::Init()
 {
+	char *SERVERADDR = "127.0.0.1";
 	//Initialise winsock lib
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa))
@@ -49,11 +50,11 @@ void Server::Init()
 		WSACleanup();
 		ExitProcess(0);
 	}
-	sockaddr_in sock_addr;
-	sock_addr.sin_family = AF_INET;
-	sock_addr.sin_port = htons(Server::PORT);
-	sock_addr.sin_addr.s_addr = 0;
-	if (bind(tcp_sock, (sockaddr*)&sock_addr, sizeof(sock_addr)))
+	sockaddr_in tcp_sock_addr;
+	tcp_sock_addr.sin_family = AF_INET;
+	tcp_sock_addr.sin_port = htons(Server::TCP_PORT);
+	tcp_sock_addr.sin_addr.s_addr = inet_addr(SERVERADDR);
+	if (bind(tcp_sock, (sockaddr*)&tcp_sock_addr, sizeof(tcp_sock_addr)))
 	{
 		printf("Error bind %d\nPress 'Enter' to exit.", WSAGetLastError());
 		closesocket(tcp_sock);
@@ -64,6 +65,17 @@ void Server::Init()
 	if ((udp_sock = socket(AF_INET, SOCK_DGRAM, 0)) == INVALID_SOCKET)
 	{
 		printf("Error creating socket %d\nPress 'Enter' to exit.", WSAGetLastError());
+		WSACleanup();
+		ExitProcess(0);
+	}
+	sockaddr_in udp_sock_addr;
+	udp_sock_addr.sin_family = AF_INET;
+	udp_sock_addr.sin_port = htons(Server::UDP_PORT);
+	udp_sock_addr.sin_addr.s_addr = inet_addr(SERVERADDR);
+	if (bind(udp_sock, (sockaddr*)&udp_sock_addr, sizeof(udp_sock_addr)))
+	{
+		printf("Error bind %d\nPress 'Enter' to exit.", WSAGetLastError());
+		closesocket(udp_sock);
 		WSACleanup();
 		ExitProcess(0);
 	}
@@ -118,7 +130,7 @@ DWORD WINAPI ClientProc(LPVOID client_socket)
 		Server::GetInstance()->Login(my_sock);
 		break;
 	case 2:
-		Server::GetInstance()->GiveOtherClientAddr(my_sock);
+		Server::GetInstance()->Connect(my_sock);
 		break;
 	case 3:
 		Server::GetInstance()->ClientLeaveChat(my_sock);
@@ -194,6 +206,7 @@ void Server::Login(SOCKET clientSock)
 	ZeroMemory(pass, STR_BUFF_SIZE);
 	recv(clientSock, login, STR_BUFF_SIZE, 0);
 	recv(clientSock, pass, STR_BUFF_SIZE, 0);
+	//get addresses
 	Client* client = nullptr;
 	if (ClientRegistered(login, client))
 	{
@@ -234,33 +247,47 @@ void Server::Login(SOCKET clientSock)
 }
 
 
-void Server::GiveOtherClientAddr(SOCKET clientSock)
+void Server::Connect(SOCKET clientSock)
 {
+	//Get data
+	char callEventNumber = 0;
 	char login[STR_BUFF_SIZE];
 	char destClientLogin[STR_BUFF_SIZE];
 	ZeroMemory(login, STR_BUFF_SIZE);
 	ZeroMemory(destClientLogin, STR_BUFF_SIZE);
 	recv(clientSock, login, STR_BUFF_SIZE, 0);
 	recv(clientSock, destClientLogin, STR_BUFF_SIZE, 0);
+	//Get dest client
 	Client* destClient;
 	ClientRegistered(destClientLogin, destClient);
-	char callEventNumber = 2;
-	sockaddr_in destAddr = destClient->udp_serv_list_addr;
-	int destAddrSize = sizeof(destAddr);
-	sendto(udp_sock, &callEventNumber, sizeof(callEventNumber), 0, (sockaddr*)&(destAddr), destAddrSize);
-	char buff[BUFF_LEN];
-	recvfrom(udp_sock, buff, BUFF_LEN, 0, (sockaddr*)&(destAddr), &destAddrSize);
-	if (strcmp(buff, "accept") == 0)
+	if (!destClient->IsOnCall())
 	{
-		char *acceptedStr = "call accepted";
-		send(clientSock, acceptedStr, strlen(acceptedStr) + 1, 0);
-		Sleep(50);
-		send(clientSock, (char*)&destAddr, destAddrSize, 0);
-	}
-	else
-	{
-		char *cancelledStr = "cancelled";
-		send(clientSock, cancelledStr, strlen(cancelledStr) + 1, 0);
+		printf("'%s' called to '%s'.\n", login);
+		//Get src client
+		Client* srcClient;
+		ClientRegistered(login, srcClient);
+		//Get clients addrs
+		sockaddr_in srcVideoListAddr = srcClient->udp_video_list_addr;
+		sockaddr_in destServListAddr = destClient->udp_serv_list_addr;
+		sockaddr_in destVideoListAddr = destClient->udp_video_list_addr;
+		//
+		int destServListAddrSize = sizeof(destServListAddr);
+		char buff[BUFF_LEN];
+		sendto(udp_sock, &callEventNumber, sizeof(callEventNumber), 0, (sockaddr*)&(destServListAddr), destServListAddrSize);
+		recvfrom(udp_sock, buff, BUFF_LEN, 0, (sockaddr*)&(destServListAddr), &destServListAddrSize);
+		if (strcmp(buff, CALL_ACCEPT_STR) == 0)
+		{
+			destClient->SetOnCall();
+			srcClient->SetOnCall();
+			sendto(udp_sock, (char*)&srcVideoListAddr, sizeof(srcVideoListAddr), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
+			send(clientSock, CALL_ACCEPT_STR, strlen(CALL_ACCEPT_STR) + 1, 0);
+			Sleep(50);
+			send(clientSock, (char*)&destVideoListAddr, sizeof(destVideoListAddr), 0);
+		}
+		else
+		{
+			send(clientSock, CALL_CANCEL_STR, strlen(CALL_CANCEL_STR) + 1, 0);
+		}
 	}
 }
 
@@ -280,6 +307,7 @@ void Server::ClientLeaveChat(SOCKET clientSock)
 		}
 	}
 	onlineClients[clientIndex]->SetOffline();
+	onlineClients[clientIndex]->SetFree();
 	char leavedClientLogin[STR_BUFF_SIZE];
 	strcpy(leavedClientLogin, onlineClients[clientIndex]->Login());
 	NotifyClientsAboutEvent(1, leavedClientLogin);
