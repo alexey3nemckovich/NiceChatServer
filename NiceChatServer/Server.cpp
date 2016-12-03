@@ -34,7 +34,7 @@ Server* Server::GetInstance()
 
 void Server::Init()
 {
-	char *SERVERADDR = "127.0.0.1";
+	char *SERVERADDR = "192.168.100.3";
 	//Initialise winsock lib
 	WSADATA wsa;
 	if (WSAStartup(MAKEWORD(2, 2), &wsa))
@@ -80,7 +80,7 @@ void Server::Init()
 		ExitProcess(0);
 	}
 }
-
+	
 
 /*
 @Server listening operation
@@ -99,8 +99,11 @@ void Server::Listen()
 		&client_addr, &client_addr_size)))
 	{
 		DWORD thID;
+		ClientConnectInfo clConnect;
+		clConnect.socket = client_socket;
+		clConnect.sock_addr = client_addr;
 		CreateThread(NULL, NULL, ClientProc,
-			&client_socket, NULL, &thID);
+			&clConnect, NULL, &thID);
 	}
 }
 
@@ -114,42 +117,46 @@ void Server::Listen()
 @	2 - connect to another client
 @	3 - leave chat
 @   4 - get online clients list
+@   5 - end connection with client
 */
 DWORD WINAPI ClientProc(LPVOID client_socket)
 {
 	char operation_num;
-	SOCKET my_sock;
-	my_sock = ((SOCKET *)client_socket)[0];
-	recv(my_sock, &operation_num, sizeof(char), 0);
+	ClientConnectInfo connectedClient;
+	connectedClient = ((ClientConnectInfo *)client_socket)[0];
+	recv(connectedClient.socket, &operation_num, sizeof(char), 0);
 	switch (operation_num)
 	{
 	case 0:
-		Server::GetInstance()->Registrate(my_sock);
+		Server::GetInstance()->Registrate(connectedClient);
 		break;
 	case 1:
-		Server::GetInstance()->Login(my_sock);
+		Server::GetInstance()->Login(connectedClient);
 		break;
 	case 2:
-		Server::GetInstance()->Connect(my_sock);
+		Server::GetInstance()->Connect(connectedClient.socket);
 		break;
 	case 3:
-		Server::GetInstance()->ClientLeaveChat(my_sock);
+		Server::GetInstance()->ClientLeaveChat(connectedClient.socket);
 		break;
 	case 4:
-		Server::GetInstance()->GiveOnlineClientsList(my_sock);
+		Server::GetInstance()->GiveOnlineClientsList(connectedClient.socket);
+		break;
+	case 5:
+		Server::GetInstance()->Disconnect(connectedClient.socket);
 		break;
 	default:
 		break;
 	}
-	if (closesocket(my_sock))
+	if (closesocket(connectedClient.socket))
 	{
-		printf("Error closing socket %d", my_sock);
+		printf("Error closing socket %d", connectedClient.socket);
 	}
 	return 0;
 }
 
 
-void Server::Registrate(SOCKET clientSock)
+void Server::Registrate(ClientConnectInfo clConnectInf)
 {
 	//Get client info
 	char name[STR_BUFF_SIZE];
@@ -160,22 +167,25 @@ void Server::Registrate(SOCKET clientSock)
 	ZeroMemory(last_name, STR_BUFF_SIZE);
 	ZeroMemory(login, STR_BUFF_SIZE);
 	ZeroMemory(pass, STR_BUFF_SIZE);
-	recv(clientSock, name, STR_BUFF_SIZE, 0);
-	recv(clientSock, last_name, STR_BUFF_SIZE, 0);
-	recv(clientSock, login, STR_BUFF_SIZE, 0);
-	recv(clientSock, pass, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, name, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, last_name, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, login, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, pass, STR_BUFF_SIZE, 0);
 	char buff[Server::BUFF_LEN];
 	ZeroMemory(buff, Server::BUFF_LEN);
-	//Get clientSock serv list addr
-	sockaddr_in udp_client_serv_list_addr;
-	recv(clientSock, buff, Server::BUFF_LEN, 0);
-	udp_client_serv_list_addr = ((sockaddr_in*)buff)[0];
-	//Get client video list addr
-	sockaddr_in udp_client_video_list_addr;
-	recv(clientSock, buff, Server::BUFF_LEN, 0);
-	udp_client_video_list_addr = ((sockaddr_in*)buff)[0];
+	//Get client udp listen ports
+	USHORT udp_client_serv_list_port;
+	USHORT udp_client_video_list_port;
+	recv(clConnectInf.socket, (char*)&udp_client_serv_list_port, sizeof(USHORT), 0);
+	recv(clConnectInf.socket, (char*)&udp_client_video_list_port, sizeof(USHORT), 0);
+	//
+	sockaddr_in udp_client_serv_list_addr, udp_client_video_list_addr;
 	if (FreeLogin(login))
 	{
+		udp_client_serv_list_addr.sin_family = udp_client_video_list_addr.sin_family = clConnectInf.sock_addr.sin_family;
+		udp_client_serv_list_addr.sin_addr = udp_client_video_list_addr.sin_addr = clConnectInf.sock_addr.sin_addr;
+		udp_client_serv_list_addr.sin_port = udp_client_serv_list_port;
+		udp_client_video_list_addr.sin_port = udp_client_video_list_port;
 		Client* client = new Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
 		client->SetOnline();
 		clients.push_back(client);
@@ -192,20 +202,24 @@ void Server::Registrate(SOCKET clientSock)
 	else
 	{
 		char *err_msg = "Login is not free.";
-		send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+		send(clConnectInf.socket, err_msg, strlen(err_msg) + 1, 0);
 	}
 }
 
 
-void Server::Login(SOCKET clientSock)
+void Server::Login(ClientConnectInfo clConnectInf)
 {
 	//Get login info
 	char login[STR_BUFF_SIZE];
 	char pass[STR_BUFF_SIZE];
 	ZeroMemory(login, STR_BUFF_SIZE);
 	ZeroMemory(pass, STR_BUFF_SIZE);
-	recv(clientSock, login, STR_BUFF_SIZE, 0);
-	recv(clientSock, pass, STR_BUFF_SIZE, 0);
+	USHORT udp_client_serv_list_port;
+	USHORT udp_client_video_list_port;
+	recv(clConnectInf.socket, login, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, pass, STR_BUFF_SIZE, 0);
+	recv(clConnectInf.socket, (char*)&udp_client_serv_list_port, sizeof(USHORT), 0);
+	recv(clConnectInf.socket, (char*)&udp_client_video_list_port, sizeof(USHORT), 0);
 	//get addresses
 	Client* client = nullptr;
 	if (ClientRegistered(login, client))
@@ -218,11 +232,14 @@ void Server::Login(SOCKET clientSock)
 				char *loginOk = "ok";
 				char *name = client->Name();
 				char *lastName = client->LastName();
-				send(clientSock, loginOk, strlen(loginOk) + 1, 0);
+				client->udp_serv_list_addr.sin_addr = client->udp_video_list_addr.sin_addr = clConnectInf.sock_addr.sin_addr;
+				client->udp_serv_list_addr.sin_port = udp_client_serv_list_port;
+				client->udp_video_list_addr.sin_port = udp_client_video_list_port;
+				send(clConnectInf.socket, loginOk, strlen(loginOk) + 1, 0);
 				Sleep(50);
-				send(clientSock, name, strlen(name) + 1, 0);
+				send(clConnectInf.socket, name, strlen(name) + 1, 0);
 				Sleep(50);
-				send(clientSock, lastName, strlen(lastName) + 1, 0);
+				send(clConnectInf.socket, lastName, strlen(lastName) + 1, 0);
 				onlineClients.push_back(client);
 				printf("Logined client '%s'.\n", login);
 				NotifyClientsAboutEvent(2, login);
@@ -230,19 +247,19 @@ void Server::Login(SOCKET clientSock)
 			else
 			{
 				char *err_msg = "Incorrect password.";
-				send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+				send(clConnectInf.socket, err_msg, strlen(err_msg) + 1, 0);
 			}
 		}
 		else
 		{
 			char *err_msg = "Client with such login is already online.";
-			send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+			send(clConnectInf.socket, err_msg, strlen(err_msg) + 1, 0);
 		}
 	}
 	else
 	{
 		char *err_msg = "Client with such login is not registered.";
-		send(clientSock, err_msg, strlen(err_msg) + 1, 0);
+		send(clConnectInf.socket, err_msg, strlen(err_msg) + 1, 0);
 	}
 }
 
@@ -262,10 +279,13 @@ void Server::Connect(SOCKET clientSock)
 	ClientRegistered(destClientLogin, destClient);
 	if (!destClient->IsOnCall())
 	{
-		printf("'%s' called to '%s'.\n", login);
 		//Get src client
 		Client* srcClient;
 		ClientRegistered(login, srcClient);
+		//mark clients status as 'OnCall'
+		destClient->SetOnCallWith(srcClient);
+		srcClient->SetOnCallWith(destClient);
+		printf("'%s' called to '%s'.\n", login, destClientLogin);
 		//Get clients addrs
 		sockaddr_in srcVideoListAddr = srcClient->udp_video_list_addr;
 		sockaddr_in destServListAddr = destClient->udp_serv_list_addr;
@@ -273,21 +293,33 @@ void Server::Connect(SOCKET clientSock)
 		//
 		int destServListAddrSize = sizeof(destServListAddr);
 		char buff[BUFF_LEN];
+		char *srcClientLogin = srcClient->Login();
 		sendto(udp_sock, &callEventNumber, sizeof(callEventNumber), 0, (sockaddr*)&(destServListAddr), destServListAddrSize);
+		Sleep(50);
+		sendto(udp_sock, srcClientLogin, strlen(srcClientLogin) + 1, 0, (sockaddr*)&(destServListAddr), destServListAddrSize);
 		recvfrom(udp_sock, buff, BUFF_LEN, 0, (sockaddr*)&(destServListAddr), &destServListAddrSize);
 		if (strcmp(buff, CALL_ACCEPT_STR) == 0)
 		{
-			destClient->SetOnCall();
-			srcClient->SetOnCall();
-			sendto(udp_sock, (char*)&srcVideoListAddr, sizeof(srcVideoListAddr), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
+			//send to src client accept str and dest client addr
 			send(clientSock, CALL_ACCEPT_STR, strlen(CALL_ACCEPT_STR) + 1, 0);
 			Sleep(50);
 			send(clientSock, (char*)&destVideoListAddr, sizeof(destVideoListAddr), 0);
+			//send to dest client src client addr
+			callEventNumber = 4;
+			sendto(udp_sock, (char*)&callEventNumber, sizeof(char), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
+			Sleep(50);
+			sendto(udp_sock, (char*)&srcVideoListAddr, sizeof(srcVideoListAddr), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
 		}
 		else
 		{
 			send(clientSock, CALL_CANCEL_STR, strlen(CALL_CANCEL_STR) + 1, 0);
+			srcClient->SetFree();
+			destClient->SetFree();
 		}
+	}
+	else
+	{
+		send(clientSock, CLIENT_ON_CALL_STR, strlen(CLIENT_ON_CALL_STR) + 1, 0);
 	}
 }
 
@@ -296,23 +328,28 @@ void Server::ClientLeaveChat(SOCKET clientSock)
 {
 	char clientLogin[BUFF_LEN];
 	recv(clientSock, clientLogin, BUFF_LEN, 0);
-	int countOnlineClients = onlineClients.size();
-	int clientIndex = 0;
-	for (int i = 0; i < countOnlineClients; i++)
+	ClientSearch onlineClientSearchInf = GetClientByLogin(clientLogin, SEARCH_FROM::ONLINE_CLIENTS);
+	Client *leavingClient = onlineClientSearchInf.client;
+	if (leavingClient->IsOnCall())
 	{
-		if (strcmp(onlineClients[i]->Login(), clientLogin) == 0)
-		{
-			clientIndex = i;
-			break;
-		}
+		NotifyClientAboutConnectionEnd(leavingClient->Interlocutor());
+		leavingClient->SetFree();
 	}
-	onlineClients[clientIndex]->SetOffline();
-	onlineClients[clientIndex]->SetFree();
-	char leavedClientLogin[STR_BUFF_SIZE];
-	strcpy(leavedClientLogin, onlineClients[clientIndex]->Login());
-	NotifyClientsAboutEvent(1, leavedClientLogin);
-	onlineClients.erase(onlineClients.begin() + clientIndex);
-	printf("Client '%s' leaved chat.\n", leavedClientLogin);
+	leavingClient->SetOffline();
+	NotifyClientsAboutEvent(1, leavingClient->Login());
+	onlineClients.erase(onlineClients.begin() + onlineClientSearchInf.searchedIndex);
+	printf("Client '%s' leaved chat.\n", leavingClient->Login());
+}
+
+
+void Server::Disconnect(SOCKET clientSock)
+{
+	char clientLogin[BUFF_LEN];
+	recv(clientSock, clientLogin, BUFF_LEN, 0);
+	ClientSearch onlineClientSearchInf = GetClientByLogin(clientLogin, SEARCH_FROM::ONLINE_CLIENTS);
+	Client *disonnectingClient = onlineClientSearchInf.client;
+	disonnectingClient->SetFree();
+	NotifyClientAboutConnectionEnd(disonnectingClient->Interlocutor());
 }
 
 
@@ -360,14 +397,20 @@ void Server::NotifyClientsAboutEvent(char eventNumber, char *eventSrcClientLogin
 }
 
 
+void Server::NotifyClientAboutConnectionEnd(Client *client)
+{
+	char eventNumber = 3;
+	sendto(udp_sock, &eventNumber, sizeof(char), 0, (sockaddr*)&(client->udp_serv_list_addr), sizeof(sockaddr_in));
+	client->SetFree();
+}
+
+
 bool Server::FreeLogin(char *login)
 {
-	for each (Client* client in clients)
+	ClientSearch clSearch = GetClientByLogin(login, SEARCH_FROM::ALL_CLIENTS);
+	if (clSearch.searchedIndex != -1)
 	{
-		if (strcmp(login, client->Login()) == 0)
-		{
-			return false;
-		}
+		return false;
 	}
 	return true;
 }
@@ -375,14 +418,43 @@ bool Server::FreeLogin(char *login)
 
 bool Server::ClientRegistered(char *login, Client* &client)
 {
-	int countRegisteredClients = clients.size();
-	for (int i = 0; i < countRegisteredClients; i++)
+	ClientSearch clSearch = GetClientByLogin(login, SEARCH_FROM::ALL_CLIENTS);
+	if (clSearch.searchedIndex != -1)
 	{
-		if (strcmp(login, clients[i]->Login()) == 0)
+		client = clSearch.client;
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+ClientSearch Server::GetClientByLogin(char *login, SEARCH_FROM searchFrom)
+{
+	ClientSearch clientSearch{ NULL, -1 };
+	std::vector<Client*> searchList;
+	switch (searchFrom)
+	{
+	case SEARCH_FROM::ALL_CLIENTS:
+		searchList = clients;
+		break;
+	case SEARCH_FROM::ONLINE_CLIENTS:
+		searchList = onlineClients;
+		break;
+	default:
+		break;
+	}
+	int listSize = searchList.size();
+	for (int i = 0; i < listSize; i++)
+	{
+		if (strcmp(searchList[i]->Login(), login) == 0)
 		{
-			client = clients[i];
-			return true;
+			clientSearch.client = searchList[i];
+			clientSearch.searchedIndex = i;
+			return clientSearch;
 		}
 	}
-	return false;
+	return clientSearch;
 }

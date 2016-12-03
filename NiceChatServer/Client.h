@@ -11,6 +11,7 @@ private:
 	char pass[STR_BUFF_SIZE];
 	bool online = false;
 	bool onCall = false;
+	Client *interlocutor;
 public:
 	Client(
 		char* name,
@@ -53,9 +54,14 @@ public:
 	{
 		return onCall;
 	}
-	void SetOnCall()
+	Client* Interlocutor()
+	{
+		return interlocutor;
+	}
+	void SetOnCallWith(Client *interlocutor)
 	{
 		onCall = true;
+		this->interlocutor = interlocutor;
 	}
 	void SetFree()
 	{

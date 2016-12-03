@@ -2,13 +2,31 @@
 
 
 #define CALL_ACCEPT_STR "accept"
-#define CALL_CANCEL_STR "cancel"
+#define CALL_CANCEL_STR "Call was not accepted"
+#define CLIENT_ON_CALL_STR "Client is already on call"
 
 
 #include <winsock2.h>
 #include <vector>
 #include "Client.h"
 #include "ClientNotFoundException.h"
+
+
+struct ClientSearch
+{
+	Client *client;
+	int searchedIndex;
+};
+
+
+struct ClientConnectInfo
+{
+	SOCKET socket;
+	sockaddr_in sock_addr;
+};
+
+
+enum class SEARCH_FROM {ONLINE_CLIENTS, ALL_CLIENTS};
 
 
 class Server
@@ -27,14 +45,17 @@ private:
 	~Server();
 	void Init();
 	friend DWORD WINAPI ClientProc(LPVOID client_socket);
-	void Registrate(SOCKET clientSock);
-	void Login(SOCKET clientSock);
+	void Registrate(ClientConnectInfo clConnectInfo);
+	void Login(ClientConnectInfo clConnectInfo);
 	void Connect(SOCKET clientSock);
-	void GiveOnlineClientsList(SOCKET clientSock);
 	void ClientLeaveChat(SOCKET clientSock);
+	void GiveOnlineClientsList(SOCKET clientSock);
+	void Disconnect(SOCKET clientSock);
 	bool FreeLogin(char *login);
 	bool ClientRegistered(char *login, Client* &client);
 	void NotifyClientsAboutEvent(char eventNumber, char *eventSrcClientLogin);
+	void NotifyClientAboutConnectionEnd(Client *client);
+	ClientSearch GetClientByLogin(char *login, SEARCH_FROM searchFrom);
 public:
 	static Server* GetInstance();
 	static const int str_buff_size = 50;
