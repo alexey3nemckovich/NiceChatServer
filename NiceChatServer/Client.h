@@ -18,8 +18,7 @@ public:
 		char* last_name,
 		char *login,
 		char *pass,
-		sockaddr_in udp_serv_list_addr,
-		sockaddr_in udp_video_list_addr
+		sockaddr_in udp_serv_list_addr
 	);
 	~Client();
 	char *const Name()
@@ -68,5 +67,4 @@ public:
 		onCall = false;
 	}
 	sockaddr_in udp_serv_list_addr;
-	sockaddr_in udp_video_list_addr;
 };

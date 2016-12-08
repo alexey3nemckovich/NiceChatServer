@@ -175,9 +175,7 @@ void Server::Registrate(ClientConnectInfo clConnectInf)
 	ZeroMemory(buff, Server::BUFF_LEN);
 	//Get client udp listen ports
 	USHORT udp_client_serv_list_port;
-	USHORT udp_client_video_list_port;
 	recv(clConnectInf.socket, (char*)&udp_client_serv_list_port, sizeof(USHORT), 0);
-	recv(clConnectInf.socket, (char*)&udp_client_video_list_port, sizeof(USHORT), 0);
 	//
 	sockaddr_in udp_client_serv_list_addr, udp_client_video_list_addr;
 	if (FreeLogin(login))
@@ -185,8 +183,7 @@ void Server::Registrate(ClientConnectInfo clConnectInf)
 		udp_client_serv_list_addr.sin_family = udp_client_video_list_addr.sin_family = clConnectInf.sock_addr.sin_family;
 		udp_client_serv_list_addr.sin_addr = udp_client_video_list_addr.sin_addr = clConnectInf.sock_addr.sin_addr;
 		udp_client_serv_list_addr.sin_port = udp_client_serv_list_port;
-		udp_client_video_list_addr.sin_port = udp_client_video_list_port;
-		Client* client = new Client(name, last_name, login, pass, udp_client_serv_list_addr, udp_client_video_list_addr);
+		Client* client = new Client(name, last_name, login, pass, udp_client_serv_list_addr);
 		client->SetOnline();
 		clients.push_back(client);
 		onlineClients.push_back(client);
@@ -215,11 +212,9 @@ void Server::Login(ClientConnectInfo clConnectInf)
 	ZeroMemory(login, STR_BUFF_SIZE);
 	ZeroMemory(pass, STR_BUFF_SIZE);
 	USHORT udp_client_serv_list_port;
-	USHORT udp_client_video_list_port;
 	recv(clConnectInf.socket, login, STR_BUFF_SIZE, 0);
 	recv(clConnectInf.socket, pass, STR_BUFF_SIZE, 0);
 	recv(clConnectInf.socket, (char*)&udp_client_serv_list_port, sizeof(USHORT), 0);
-	recv(clConnectInf.socket, (char*)&udp_client_video_list_port, sizeof(USHORT), 0);
 	//get addresses
 	Client* client = nullptr;
 	if (ClientRegistered(login, client))
@@ -232,9 +227,8 @@ void Server::Login(ClientConnectInfo clConnectInf)
 				char *loginOk = "ok";
 				char *name = client->Name();
 				char *lastName = client->LastName();
-				client->udp_serv_list_addr.sin_addr = client->udp_video_list_addr.sin_addr = clConnectInf.sock_addr.sin_addr;
+				client->udp_serv_list_addr.sin_addr = clConnectInf.sock_addr.sin_addr;
 				client->udp_serv_list_addr.sin_port = udp_client_serv_list_port;
-				client->udp_video_list_addr.sin_port = udp_client_video_list_port;
 				send(clConnectInf.socket, loginOk, strlen(loginOk) + 1, 0);
 				Sleep(50);
 				send(clConnectInf.socket, name, strlen(name) + 1, 0);
@@ -287,9 +281,7 @@ void Server::Connect(SOCKET clientSock)
 		srcClient->SetOnCallWith(destClient);
 		printf("'%s' called to '%s'.\n", login, destClientLogin);
 		//Get clients addrs
-		sockaddr_in srcVideoListAddr = srcClient->udp_video_list_addr;
 		sockaddr_in destServListAddr = destClient->udp_serv_list_addr;
-		sockaddr_in destVideoListAddr = destClient->udp_video_list_addr;
 		//
 		int destServListAddrSize = sizeof(destServListAddr);
 		char buff[BUFF_LEN];
@@ -300,15 +292,17 @@ void Server::Connect(SOCKET clientSock)
 		recvfrom(udp_sock, buff, BUFF_LEN, 0, (sockaddr*)&(destServListAddr), &destServListAddrSize);
 		if (strcmp(buff, CALL_ACCEPT_STR) == 0)
 		{
+			//get from dest client his video list addr
+			callEventNumber = 4;
+			sendto(udp_sock, (char*)&callEventNumber, sizeof(char), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
+			Sleep(50);
+			sockaddr_in destVideoListAddr;
+			recvfrom(udp_sock, (char*)&destVideoListAddr, sizeof(destVideoListAddr), 0, (sockaddr*)&destServListAddr, &destServListAddrSize);
+			destVideoListAddr.sin_addr = destServListAddr.sin_addr;
 			//send to src client accept str and dest client addr
 			send(clientSock, CALL_ACCEPT_STR, strlen(CALL_ACCEPT_STR) + 1, 0);
 			Sleep(50);
 			send(clientSock, (char*)&destVideoListAddr, sizeof(destVideoListAddr), 0);
-			//send to dest client src client addr
-			callEventNumber = 4;
-			sendto(udp_sock, (char*)&callEventNumber, sizeof(char), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
-			Sleep(50);
-			sendto(udp_sock, (char*)&srcVideoListAddr, sizeof(srcVideoListAddr), 0, (sockaddr*)&destServListAddr, destServListAddrSize);
 		}
 		else
 		{
@@ -349,6 +343,7 @@ void Server::Disconnect(SOCKET clientSock)
 	ClientSearch onlineClientSearchInf = GetClientByLogin(clientLogin, SEARCH_FROM::ONLINE_CLIENTS);
 	Client *disonnectingClient = onlineClientSearchInf.client;
 	disonnectingClient->SetFree();
+	//disonnectingClient->Interlocutor()->SetFree();
 	NotifyClientAboutConnectionEnd(disonnectingClient->Interlocutor());
 }
 
